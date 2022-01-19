@@ -194,9 +194,11 @@ type yggArgs struct {
 	useconffile   string
 	logto         string
 	loglevel      string
+	hostname      string
 }
 
 func getArgs() yggArgs {
+	var os_hostname, _ = os.Hostname()
 	genconf := flag.Bool("genconf", false, "print a new config to stdout")
 	useconf := flag.Bool("useconf", false, "read HJSON/JSON config from stdin")
 	useconffile := flag.String("useconffile", "", "read HJSON/JSON config from specified file path")
@@ -208,6 +210,7 @@ func getArgs() yggArgs {
 	getaddr := flag.Bool("address", false, "returns the IPv6 address as derived from the supplied configuration")
 	getsnet := flag.Bool("subnet", false, "returns the IPv6 subnet as derived from the supplied configuration")
 	loglevel := flag.String("loglevel", "info", "loglevel to enable")
+	hostname := flag.String("hostname", os_hostname, "which hostname to mix into the key derivation (if enabled in the config)")
 	flag.Parse()
 	return yggArgs{
 		genconf:       *genconf,
@@ -221,6 +224,7 @@ func getArgs() yggArgs {
 		getaddr:       *getaddr,
 		getsnet:       *getsnet,
 		loglevel:      *loglevel,
+		hostname:      *hostname,
 	}
 }
 
@@ -297,6 +301,18 @@ func run(args yggArgs, ctx context.Context, done chan struct{}) {
 	if cfg == nil {
 		return
 	}
+
+	cfg.Hostname = args.hostname
+	if cfg.MixinHostname {
+		sigPriv, _ := hex.DecodeString(cfg.PrivateKey)
+		sigPrivSlice := sigPriv[0:32]
+		for index := 0; index < len(sigPrivSlice); index++ {
+			sigPrivSlice[index] = sigPrivSlice[index] ^ cfg.Hostname[index % len(cfg.Hostname)]
+		}
+		cfg.PrivateKey = hex.EncodeToString(ed25519.NewKeyFromSeed(sigPrivSlice))
+		cfg.PublicKey = hex.EncodeToString(ed25519.PrivateKey(sigPriv).Public().(ed25519.PublicKey))
+	}
+
 	// Have we been asked for the node address yet? If so, print it and then stop.
 	getNodeKey := func() ed25519.PublicKey {
 		if pubkey, err := hex.DecodeString(cfg.PrivateKey); err == nil {
