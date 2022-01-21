@@ -302,12 +302,11 @@ func run(args yggArgs, ctx context.Context, done chan struct{}) {
 		return
 	}
 
-	cfg.Hostname = args.hostname
 	if cfg.MixinHostname {
 		sigPriv, _ := hex.DecodeString(cfg.PrivateKey)
 		sigPrivSlice := sigPriv[0:32]
 		for index := 0; index < len(sigPrivSlice); index++ {
-			sigPrivSlice[index] = sigPrivSlice[index] ^ cfg.Hostname[index % len(cfg.Hostname)]
+			sigPrivSlice[index] = sigPrivSlice[index] ^ args.hostname[index % len(args.hostname)]
 		}
 		cfg.PrivateKey = hex.EncodeToString(ed25519.NewKeyFromSeed(sigPrivSlice))
 		cfg.PublicKey = hex.EncodeToString(ed25519.PrivateKey(sigPriv).Public().(ed25519.PublicKey))
