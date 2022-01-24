@@ -19,17 +19,20 @@ type args struct {
 	useconffile    string
 	port           int
 	address        string
+	domain         string
 }
 
 func getArgs() args {
 	useconffile := flag.String("useconffile", "conf", "config file to read the private key from")
 	port := flag.Int("port", 55353, "port to listen on (UDP)")
 	address := flag.String("address", "", "the address to bind to")
+	domain := flag.String("domain", ".", "the domain to answer for")
 	flag.Parse()
 	return args{
 		useconffile: *useconffile,
 		port: *port,
 		address: *address,
+		domain: *domain,
 	}
 }
 
@@ -87,7 +90,7 @@ func main() {
 	privateKey = sigPriv[0:32]
 
 	// attach request handler func
-	dns.HandleFunc(".", handleDnsRequest)
+	dns.HandleFunc(args.domain, handleDnsRequest)
 
 	// start server
 	port := args.port
