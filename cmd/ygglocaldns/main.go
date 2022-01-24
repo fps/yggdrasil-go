@@ -1,5 +1,9 @@
 package main
 
+/*
+	This code is adapted from the Simple Golang DNS Server example by github user walm: https://gist.github.com/walm/0d67b4fb2d5daf3edd4fad3e13b162cb
+*/
+
 import (
 	"fmt"
 	"log"
@@ -26,7 +30,7 @@ func getArgs() args {
 	useconffile := flag.String("useconffile", "conf", "config file to read the private key from")
 	port := flag.Int("port", 55353, "port to listen on (UDP)")
 	address := flag.String("address", "", "the address to bind to")
-	domain := flag.String("domain", ".", "the domain to answer for")
+	domain := flag.String("domain", ".", "the domain to answer for - make sure it ends with a dot, e.g.: \"ygg.local.\"")
 	flag.Parse()
 	return args{
 		useconffile: *useconffile,
