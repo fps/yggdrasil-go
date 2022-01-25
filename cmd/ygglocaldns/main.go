@@ -11,6 +11,7 @@ import (
 	"flag"
 	"io/ioutil"
 	"net"
+	"strings"
 	"crypto/ed25519"
 	"encoding/hex"
 
@@ -41,6 +42,7 @@ func getArgs() args {
 }
 
 var privateKey []byte
+var domain string
 
 func parseQuery(m *dns.Msg) {
 	for _, q := range m.Question {
@@ -48,7 +50,10 @@ func parseQuery(m *dns.Msg) {
 		case dns.TypeA:
 			log.Printf("Query for %s\n", q.Name)
 			new_seed := make([]byte, 32)
-			name := q.Name[0:len(q.Name)-1]
+            stripped_name := strings.TrimSuffix(q.Name, domain)
+			name := stripped_name[0:len(stripped_name)-1]
+			log.Println(name)
+            
 	        for index := 0; index < len(new_seed); index++ {
 				new_seed[index] = privateKey[index] ^ name[index % len(name)]
 			}
@@ -92,6 +97,9 @@ func main() {
 	// fmt.Println(cfg["PrivateKey"])
 	sigPriv, _ := hex.DecodeString(cfg["PrivateKey"].(string))
 	privateKey = sigPriv[0:32]
+    domain = args.domain
+
+	log.Println("Serving for domain: \"" + domain + "\"")
 
 	// attach request handler func
 	dns.HandleFunc(args.domain, handleDnsRequest)
