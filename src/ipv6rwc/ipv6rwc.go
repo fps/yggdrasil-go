@@ -301,12 +301,15 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 		fmt.Println(bs[24:40])
 		if bs[24] == 0xff && bs[25] == 0x02 && bs[39] == 0xfb {
 			fmt.Println("mDNS address")
-			fmt.Println(string(bs[40:]))
-			fmt.Println(bs[40:])
+			fmt.Println("length: ", len(bs[48:]))
+			fmt.Println("string: \"", string(bs[48:]), "\"")
+			fmt.Println("bytes: ", bs[48:])
 			var msg dns.Msg
 			if err := msg.Unpack(bs[48:]); err != nil {
 				fmt.Println("We got a DNS packet:")
+				fmt.Println(msg.String())
 				for _, r := range msg.Question {
+					fmt.Println(r.String())
 					if r.Qclass == dns.ClassINET {
 						fmt.Println(r.Name)
 					}
