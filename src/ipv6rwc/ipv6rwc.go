@@ -11,8 +11,9 @@ import (
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv6"
 
-    "github.com/google/gopacket"
-    "github.com/google/gopacket/layers"
+    // "github.com/google/gopacket"
+    // "github.com/google/gopacket/layers"
+	"github.com/miekg/dns"
 
 	iwt "github.com/Arceliar/ironwood/types"
 
@@ -297,6 +298,16 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 	} else if dstSubnet.IsValid() {
 		k.sendToSubnet(dstSubnet, bs)
 	} else {
+		// Check if the destination is the mDNS address. 
+		var msg dns.Msg
+		if err := msg.Unpack(bs[36:]); err != nil {
+			fmt.Println("We got a DNS packet:")
+			for _, r := range msg.Question {
+				if r.Qclass == dns.ClassINET {
+					fmt.Println(r.Name)
+				}
+			}
+		}
 		/*
 		packet := gopacket.NewPacket(bs, layers.LayerTypeIPv6, gopacket.Default)
 		fmt.Println(string(packet.ApplicationLayer().Payload()))
