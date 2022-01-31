@@ -11,6 +11,9 @@ import (
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv6"
 
+    "github.com/google/gopacket"
+    "github.com/google/gopacket/layers"
+
 	iwt "github.com/Arceliar/ironwood/types"
 
 	"github.com/yggdrasil-network/yggdrasil-go/src/address"
@@ -283,7 +286,10 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 	if srcAddr != k.address && srcSubnet != k.subnet {
 		// This happens all the time due to link-local traffic
 		// Don't send back an error, just drop it
-		strErr := fmt.Sprint("incorrect source address: ", net.IP(srcAddr[:]).String())
+		// packet := gopacket.NewPacket(bs, layers.LayerTypeIPv6, gopacket.Default)
+		// fmt.Println(string(packet.ApplicationLayer().Payload()))
+		strErr := fmt.Sprint("incorrect source address: ", net.IP(srcAddr[:]).String(), " (destination: ", net.IP(dstAddr[:]).String(), ")")
+        // fmt.Println(bs)
 		return 0, errors.New(strErr)
 	}
 	if dstAddr.IsValid() {
@@ -291,7 +297,14 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 	} else if dstSubnet.IsValid() {
 		k.sendToSubnet(dstSubnet, bs)
 	} else {
-		return 0, errors.New("invalid destination address")
+		/*
+		packet := gopacket.NewPacket(bs, layers.LayerTypeIPv6, gopacket.Default)
+		fmt.Println(string(packet.ApplicationLayer().Payload()))
+		for _, layer := range packet.Layers() {
+			fmt.Println("PACKET LAYER:", layer.LayerType())
+		}
+		*/
+		return 0, errors.New(fmt.Sprint("invalid destination address: ", net.IP(dstAddr[:]).String(), " (source: ", net.IP(srcAddr[:]).String()))
 	}
 	return len(bs), nil
 }
