@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	"strings"
 	// "encoding/hex"
 
 	"golang.org/x/net/icmp"
@@ -14,7 +15,8 @@ import (
 
     // "github.com/google/gopacket"
     // "github.com/google/gopacket/layers"
-	"github.com/miekg/dns"
+	// "github.com/miekg/dns"
+	"golang.org/x/net/dns/dnsmessage"
 
 	iwt "github.com/Arceliar/ironwood/types"
 
@@ -302,19 +304,25 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 		if bs[24] == 0xff && bs[25] == 0x02 && bs[39] == 0xfb {
 			fmt.Println("mDNS address")
 			fmt.Println("length: ", len(bs[48:]))
-			fmt.Println("string: \"", string(bs[48:]), "\"")
+			// fmt.Println("string: \"", string(bs[48:]), "\"")
 			fmt.Println("bytes: ", bs[48:])
-			var msg dns.Msg
-			if err := msg.Unpack(bs[48:]); err != nil {
-				fmt.Println("We got a DNS packet:")
-				fmt.Println(msg.String())
-				for _, r := range msg.Question {
-					fmt.Println(r.String())
-					if r.Qclass == dns.ClassINET {
-						fmt.Println(r.Name)
+			var msg dnsmessage.Message
+			err := msg.Unpack(bs[48:])
+			if err != nil {
+				fmt.Println(err)
+			} else {
+				for _, q := range msg.Questions {
+					fmt.Println("Question: ", q.Name.String())
+					if strings.HasSuffix(q.Name.String(), ".ygg.local.") {
+						fmt.Println("Looks like a real request")
+						reply := new(dnsmessage.Message)
+						reply.Header.Response = true;
+						reply.Header.ID = msg.Header.ID
+						reply.Answers = append(reply.Answers, dnsmessage.Resource{ dnsmessage.ResourceHeader{q.Name, 0, dnsmessage.ClassINET, 1, 0}, dnsmessage.AAAAResource{[]byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}}} )
 					}
 				}
 			}
+			
 		}
 		return 0, errors.New(fmt.Sprint("invalid destination address: ", net.IP(dstAddr[:]).String(), " (source: ", net.IP(srcAddr[:]).String()))
 	}
