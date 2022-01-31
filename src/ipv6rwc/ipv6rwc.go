@@ -7,6 +7,7 @@ import (
 	"net"
 	"sync"
 	"time"
+	// "encoding/hex"
 
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv6"
@@ -287,8 +288,6 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 	if srcAddr != k.address && srcSubnet != k.subnet {
 		// This happens all the time due to link-local traffic
 		// Don't send back an error, just drop it
-		// packet := gopacket.NewPacket(bs, layers.LayerTypeIPv6, gopacket.Default)
-		// fmt.Println(string(packet.ApplicationLayer().Payload()))
 		strErr := fmt.Sprint("incorrect source address: ", net.IP(srcAddr[:]).String(), " (destination: ", net.IP(dstAddr[:]).String(), ")")
         // fmt.Println(bs)
 		return 0, errors.New(strErr)
@@ -299,22 +298,21 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 		k.sendToSubnet(dstSubnet, bs)
 	} else {
 		// Check if the destination is the mDNS address. 
-		var msg dns.Msg
-		if err := msg.Unpack(bs[36:]); err != nil {
-			fmt.Println("We got a DNS packet:")
-			for _, r := range msg.Question {
-				if r.Qclass == dns.ClassINET {
-					fmt.Println(r.Name)
+		fmt.Println(bs[24:40])
+		if bs[24] == 0xff && bs[25] == 0x02 && bs[39] == 0xfb {
+			fmt.Println("mDNS address")
+			fmt.Println(string(bs[40:]))
+			fmt.Println(bs[40:])
+			var msg dns.Msg
+			if err := msg.Unpack(bs[48:]); err != nil {
+				fmt.Println("We got a DNS packet:")
+				for _, r := range msg.Question {
+					if r.Qclass == dns.ClassINET {
+						fmt.Println(r.Name)
+					}
 				}
 			}
 		}
-		/*
-		packet := gopacket.NewPacket(bs, layers.LayerTypeIPv6, gopacket.Default)
-		fmt.Println(string(packet.ApplicationLayer().Payload()))
-		for _, layer := range packet.Layers() {
-			fmt.Println("PACKET LAYER:", layer.LayerType())
-		}
-		*/
 		return 0, errors.New(fmt.Sprint("invalid destination address: ", net.IP(dstAddr[:]).String(), " (source: ", net.IP(srcAddr[:]).String()))
 	}
 	return len(bs), nil

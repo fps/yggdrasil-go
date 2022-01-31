@@ -9,7 +9,7 @@ require (
 	github.com/cheggaaa/pb/v3 v3.0.8
 	github.com/fatih/color v1.12.0 // indirect
 	github.com/gologme/log v1.2.0
-	github.com/google/gopacket v1.1.19 
+	github.com/google/gopacket v1.1.19 // indirect
 	github.com/hashicorp/go-syslog v1.0.0
 	github.com/hjson/hjson-go v3.1.0+incompatible
 	github.com/kardianos/minwinsvc v1.0.0
