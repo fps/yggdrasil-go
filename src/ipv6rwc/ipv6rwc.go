@@ -262,6 +262,7 @@ func (k *keyStore) readPC(p []byte) (int, error) {
 		copy(srcSubnet[:], bs[8:])
 		copy(dstSubnet[:], bs[24:])
 		if dstAddr != k.address && dstSubnet != k.subnet {
+			fmt.Println(dstAddr, dstSubnet)
 			continue // bad local address/subnet
 		}
 		info := k.update(ed25519.PublicKey(from.(iwt.Addr)))
@@ -305,9 +306,10 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 			fmt.Println("mDNS address")
 			fmt.Println("length: ", len(bs[48:]))
 			// fmt.Println("string: \"", string(bs[48:]), "\"")
-			fmt.Println("bytes: ", bs[48:])
+			fmt.Println("bytes: ", bs)
 			var msg dnsmessage.Message
 			err := msg.Unpack(bs[48:])
+			fmt.Println(msg)
 			if err != nil {
 				fmt.Println(err)
 			} else {
@@ -315,14 +317,49 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 					fmt.Println("Question: ", q.Name.String())
 					if strings.HasSuffix(q.Name.String(), ".ygg.local.") {
 						fmt.Println("Looks like a real request")
-						reply := new(dnsmessage.Message)
-						reply.Header.Response = true;
-						reply.Header.ID = msg.Header.ID
-						reply.Answers = append(reply.Answers, dnsmessage.Resource{ dnsmessage.ResourceHeader{q.Name, 0, dnsmessage.ClassINET, 1, 0}, dnsmessage.AAAAResource{[]byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}}} )
+						rsp := dnsmessage.Message{
+							Header: dnsmessage.Header{Response: true, Authoritative: true},
+							Answers: []dnsmessage.Resource{
+								{
+									Header:  dnsmessage.ResourceHeader{
+										Name: q.Name,
+										Type: dnsmessage.TypeAAAA,
+										Class: dnsmessage.ClassINET,
+									},
+									Body: &dnsmessage.AAAAResource{ AAAA: [16]byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15} },
+								},
+							},
+						}
+						buf, _ := rsp.Pack()
+						/*
+						builder := dnsmessage.NewBuilder(buf, dnsmessage.Header{msg.Header.ID, true, 0, true, false, false, false, dnsmessage.RCodeSuccess})
+						builder.StartAnswers()
+						builder.AAAAResource(dnsmessage.ResourceHeader{q.Name, 0, dnsmessage.ClassINET, 1, 0}, dnsmessage.AAAAResource{[16]byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}})
+						buf, err = builder.Finish()
+						var msg2 dnsmessage.Message
+						err := msg.Unpack(buf)
+						fmt.Println(msg2)
+						if err != nil { fmt.Println(err) }
+						*/
+						c := make([]byte, 0, 1024)
+						c = append(c, bs[:48]...)
+						copy(c[24:], srcAddr[:])
+						copy(c[8:], dstAddr[:])
+						c = append(c, buf[:]...)
+						l := len(c)
+						c[4] = byte(l-40)
+						c[44] = byte(l-48)
+						copy(c[40:42], bs[42:44])
+						copy(c[42:44], bs[40:42])
+						c[46] = 0
+						c[47] = 0
+						fmt.Println("sending answer, len: ", len(c))
+						fmt.Println(c)
+						_, _ = k.writePC(c[:])
+						fmt.Println("done")
 					}
 				}
 			}
-			
 		}
 		return 0, errors.New(fmt.Sprint("invalid destination address: ", net.IP(dstAddr[:]).String(), " (source: ", net.IP(srcAddr[:]).String()))
 	}
