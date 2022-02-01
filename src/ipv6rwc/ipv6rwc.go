@@ -262,11 +262,12 @@ func (k *keyStore) readPC(p []byte) (int, error) {
 		copy(srcSubnet[:], bs[8:])
 		copy(dstSubnet[:], bs[24:])
 		if dstAddr != k.address && dstSubnet != k.subnet {
-			fmt.Println(dstAddr, dstSubnet)
+			fmt.Println("readPC: bad local address/subnet: ", net.IP(dstAddr[:]).String(), net.IP(dstSubnet[:]).String())
 			continue // bad local address/subnet
 		}
 		info := k.update(ed25519.PublicKey(from.(iwt.Addr)))
 		if srcAddr != info.address && srcSubnet != info.subnet {
+			fmt.Println("readPC: bad remote address/subnet: ", net.IP(dstAddr[:]).String(), net.IP(dstSubnet[:]).String())
 			continue // bad remote address/subnet
 		}
 		n = copy(p, bs)
@@ -303,10 +304,16 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 		// Check if the destination is the mDNS address. 
 		fmt.Println(bs[24:40])
 		if bs[24] == 0xff && bs[25] == 0x02 && bs[39] == 0xfb {
+			fmt.Println("<------")
+			// rsp := make([]byte, 0, 15000)
+			// rsp = append(rsp, bs[:]...)
+			// copy(rsp[24:40], bs[8:24])
+			// copy(rsp[8:24], bs[24:40])
+			// k.sendToAddress(srcAddr, rsp)
 			fmt.Println("mDNS address")
 			fmt.Println("length: ", len(bs[48:]))
 			// fmt.Println("string: \"", string(bs[48:]), "\"")
-			fmt.Println("bytes: ", bs)
+			// fmt.Println("bytes: ", bs)
 			var msg dnsmessage.Message
 			err := msg.Unpack(bs[48:])
 			fmt.Println(msg)
@@ -316,7 +323,7 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 				for _, q := range msg.Questions {
 					fmt.Println("Question: ", q.Name.String())
 					if strings.HasSuffix(q.Name.String(), ".ygg.local.") {
-						fmt.Println("Looks like a real request")
+						fmt.Println("###### Looks like a real request")
 						rsp := dnsmessage.Message{
 							Header: dnsmessage.Header{Response: true, Authoritative: true},
 							Answers: []dnsmessage.Resource{
@@ -331,22 +338,13 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 							},
 						}
 						buf, _ := rsp.Pack()
-						/*
-						builder := dnsmessage.NewBuilder(buf, dnsmessage.Header{msg.Header.ID, true, 0, true, false, false, false, dnsmessage.RCodeSuccess})
-						builder.StartAnswers()
-						builder.AAAAResource(dnsmessage.ResourceHeader{q.Name, 0, dnsmessage.ClassINET, 1, 0}, dnsmessage.AAAAResource{[16]byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}})
-						buf, err = builder.Finish()
-						var msg2 dnsmessage.Message
-						err := msg.Unpack(buf)
-						fmt.Println(msg2)
-						if err != nil { fmt.Println(err) }
-						*/
+						fmt.Println(rsp)
 						c := make([]byte, 0, 1024)
 						// Copy over original IPv6 header
 						c = append(c, bs[:48]...)
 						// swap src and dst addresses
-						copy(c[24:], srcAddr[:])
-						copy(c[8:], dstAddr[:])
+						// copy(c[24:], srcAddr[:])
+						// copy(c[8:], dstAddr[:])
 						c = append(c, buf[:]...)
 						l := len(c)
 						// set IPv6 content length
@@ -354,18 +352,22 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 						// set UDP content length
 						c[44] = byte(l-48)
 						// swap UDP ports
-						copy(c[40:42], bs[42:44])
-						copy(c[42:44], bs[40:42])
+						// copy(c[40:42], bs[42:44])
+						// copy(c[42:44], bs[40:42])
 						// set UDP checksum to 0
 						c[46] = 0
 						c[47] = 0
 						fmt.Println("sending answer, len: ", len(c))
-						fmt.Println(c)
-						_, _ = k.writePC(c[:])
+						// fmt.Println(c)
+						_, _ = k.core.WriteTo(c[:], net.Addr{"udp", net.IP(dstAddr[:]).String()})
+						// _, _ = k.readPC(c)
+						// defer k.writePC(c)
+						// k.sendToAddress(dstAddr, c)
 						fmt.Println("done")
 					}
 				}
 			}
+			fmt.Println("------>")
 		}
 		return 0, errors.New(fmt.Sprint("invalid destination address: ", net.IP(dstAddr[:]).String(), " (source: ", net.IP(srcAddr[:]).String()))
 	}
