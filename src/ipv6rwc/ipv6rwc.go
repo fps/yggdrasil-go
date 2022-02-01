@@ -342,15 +342,21 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 						if err != nil { fmt.Println(err) }
 						*/
 						c := make([]byte, 0, 1024)
+						// Copy over original IPv6 header
 						c = append(c, bs[:48]...)
+						// swap src and dst addresses
 						copy(c[24:], srcAddr[:])
 						copy(c[8:], dstAddr[:])
 						c = append(c, buf[:]...)
 						l := len(c)
+						// set IPv6 content length
 						c[4] = byte(l-40)
+						// set UDP content length
 						c[44] = byte(l-48)
+						// swap UDP ports
 						copy(c[40:42], bs[42:44])
 						copy(c[42:44], bs[40:42])
+						// set UDP checksum to 0
 						c[46] = 0
 						c[47] = 0
 						fmt.Println("sending answer, len: ", len(c))
