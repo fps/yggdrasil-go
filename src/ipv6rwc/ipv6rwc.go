@@ -7,7 +7,7 @@ import (
 	"net"
 	"sync"
 	"time"
-	"strings"
+	// "strings"
 	// "encoding/hex"
 
 	"golang.org/x/net/icmp"
@@ -16,7 +16,7 @@ import (
     // "github.com/google/gopacket"
     // "github.com/google/gopacket/layers"
 	// "github.com/miekg/dns"
-	"golang.org/x/net/dns/dnsmessage"
+	// "golang.org/x/net/dns/dnsmessage"
 
 	iwt "github.com/Arceliar/ironwood/types"
 
@@ -301,74 +301,6 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 	} else if dstSubnet.IsValid() {
 		k.sendToSubnet(dstSubnet, bs)
 	} else {
-		// Check if the destination is the mDNS address. 
-		fmt.Println(bs[24:40])
-		if bs[24] == 0xff && bs[25] == 0x02 && bs[39] == 0xfb {
-			fmt.Println("<------")
-			// rsp := make([]byte, 0, 15000)
-			// rsp = append(rsp, bs[:]...)
-			// copy(rsp[24:40], bs[8:24])
-			// copy(rsp[8:24], bs[24:40])
-			// k.sendToAddress(srcAddr, rsp)
-			fmt.Println("mDNS address")
-			fmt.Println("length: ", len(bs[48:]))
-			// fmt.Println("string: \"", string(bs[48:]), "\"")
-			// fmt.Println("bytes: ", bs)
-			var msg dnsmessage.Message
-			err := msg.Unpack(bs[48:])
-			fmt.Println(msg)
-			if err != nil {
-				fmt.Println(err)
-			} else {
-				for _, q := range msg.Questions {
-					fmt.Println("Question: ", q.Name.String())
-					if strings.HasSuffix(q.Name.String(), ".ygg.local.") {
-						fmt.Println("###### Looks like a real request")
-						rsp := dnsmessage.Message{
-							Header: dnsmessage.Header{Response: true, Authoritative: true},
-							Answers: []dnsmessage.Resource{
-								{
-									Header:  dnsmessage.ResourceHeader{
-										Name: q.Name,
-										Type: dnsmessage.TypeAAAA,
-										Class: dnsmessage.ClassINET,
-									},
-									Body: &dnsmessage.AAAAResource{ AAAA: [16]byte{1,2,3,4,5,6,7,8,9,10,11,12,13,14,15} },
-								},
-							},
-						}
-						buf, _ := rsp.Pack()
-						fmt.Println(rsp)
-						c := make([]byte, 0, 1024)
-						// Copy over original IPv6 header
-						c = append(c, bs[:48]...)
-						// swap src and dst addresses
-						// copy(c[24:], srcAddr[:])
-						// copy(c[8:], dstAddr[:])
-						c = append(c, buf[:]...)
-						l := len(c)
-						// set IPv6 content length
-						c[4] = byte(l-40)
-						// set UDP content length
-						c[44] = byte(l-48)
-						// swap UDP ports
-						// copy(c[40:42], bs[42:44])
-						// copy(c[42:44], bs[40:42])
-						// set UDP checksum to 0
-						c[46] = 0
-						c[47] = 0
-						fmt.Println("sending answer, len: ", len(c))
-						// fmt.Println(c)
-						_, _ = k.core.WriteTo(c[:], net.Addr{"udp", net.IP(dstAddr[:]).String()})
-						// _, _ = k.readPC(c)
-						// defer k.writePC(c)
-						// k.sendToAddress(dstAddr, c)
-						fmt.Println("done")
-					}
-				}
-			}
-			fmt.Println("------>")
-		}
 		return 0, errors.New(fmt.Sprint("invalid destination address: ", net.IP(dstAddr[:]).String(), " (source: ", net.IP(srcAddr[:]).String()))
 	}
 	return len(bs), nil
