@@ -3,6 +3,7 @@ package tuntap
 import (
 	"fmt"
 	"strings"
+	"crypto/ed25519"
 	"golang.org/x/net/dns/dnsmessage"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -10,33 +11,38 @@ import (
 
 const TUN_OFFSET_BYTES = 4
 
+func MixinHostname(masterKey ed25519.PrivateKey, hostname string) {
+
+}
+
 func (tun *TunAdapter) handle_mDNS(bs []byte) {
 	packet := gopacket.NewPacket(bs, layers.LayerTypeIPv6, gopacket.Default)
 
 	ip := packet.Layer(layers.LayerTypeIPv6)
 	if ip == nil {
-		fmt.Println("no ip layer")
+		// fmt.Println("no ip layer")
 		return
 	}
 	// fmt.Println(ip.(*layers.IPv6).SrcIP)
 	udp := packet.Layer(layers.LayerTypeUDP);
 	 if udp == nil {
-		fmt.Println("no udp layer")
+		// fmt.Println("no udp layer")
 		return
 	}
-	fmt.Println(udp.(*layers.UDP).Payload)
+	// fmt.Println(udp.(*layers.UDP).Payload)
 
 	var msg dnsmessage.Message
 	err := msg.Unpack(udp.(*layers.UDP).Payload)
 	// fmt.Println(msg)
 	if err != nil {
 		fmt.Println("Error unpacking: ", err)
+		return
 	} else {
 		for _, q := range msg.Questions {
 			if q.Type != dnsmessage.TypeAAAA { continue }
 			if !strings.HasSuffix(q.Name.String(), ".ygg.local.") { continue }
 
-			fmt.Println("###### Looks like a real request")
+			fmt.Println("Got an mDNS request")
 			var address [16]byte
 			copy(address[:], bs[8:24])
 			rsp := dnsmessage.Message{
@@ -60,7 +66,7 @@ func (tun *TunAdapter) handle_mDNS(bs []byte) {
 				return
 			}
 
-			fmt.Println("dns message length: ", len(rspbuf))
+			// fmt.Println("dns message length: ", len(rspbuf))
 
 			ipp := *(ip.(*layers.IPv6))
 			udpp := *(udp.(*layers.UDP))
@@ -74,14 +80,14 @@ func (tun *TunAdapter) handle_mDNS(bs []byte) {
 				gopacket.Payload(rspbuf[:]),
 			)
 
-			fmt.Println("final size: ", len(buf.Bytes()))
+			// fmt.Println("final size: ", len(buf.Bytes()))
 
 			out_buf := make([]byte, 0, 65553)
 			out_buf = append(out_buf, 0x00, 0x00, 0x00, 0x00)
 			out_buf = append(out_buf, buf.Bytes()...)
 
 			tun.iface.Write(out_buf[:], TUN_OFFSET_BYTES)
-			fmt.Println("done")
+			// fmt.Println("done")
 		}
     }
 }
@@ -101,8 +107,10 @@ func (tun *TunAdapter) read() {
 		begin := TUN_OFFSET_BYTES
 		end := begin + n
 		bs := buf[begin:end]
-		if bs[24] == 0xff && bs[25] == 0x02 && bs[39] == 0xfb {
-            tun.handle_mDNS(bs)
+		if tun.config.MixinHostname {
+			if bs[24] == 0xff && bs[25] == 0x02 && bs[39] == 0xfb {
+	            tun.handle_mDNS(bs)
+			}
 		}
 		if _, err := tun.rwc.Write(bs); err != nil {
 			tun.log.Debugln("Unable to send packet:", err)
