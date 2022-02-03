@@ -6,28 +6,23 @@ import (
 	"golang.org/x/net/dns/dnsmessage"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
-)	
+)
 
 const TUN_OFFSET_BYTES = 4
 
 func (tun *TunAdapter) handle_mDNS(bs []byte) {
 	packet := gopacket.NewPacket(bs, layers.LayerTypeIPv6, gopacket.Default)
-	/*
-	for _, layer := range packet.Layers() {
-		fmt.Println("PACKET LAYER:", layer.LayerType())
-	}
-	*/
 
 	ip := packet.Layer(layers.LayerTypeIPv6)
-	if ip == nil { 
+	if ip == nil {
 		fmt.Println("no ip layer")
-		return 
+		return
 	}
-	fmt.Println(ip.(*layers.IPv6).SrcIP)
+	// fmt.Println(ip.(*layers.IPv6).SrcIP)
 	udp := packet.Layer(layers.LayerTypeUDP);
-	 if udp == nil { 
+	 if udp == nil {
 		fmt.Println("no udp layer")
-		return 
+		return
 	}
 	fmt.Println(udp.(*layers.UDP).Payload)
 
@@ -39,14 +34,14 @@ func (tun *TunAdapter) handle_mDNS(bs []byte) {
 	} else {
 		for _, q := range msg.Questions {
 			if q.Type != dnsmessage.TypeAAAA { continue }
-			if !strings.HasSuffix(q.Name.String(), ".ygg.local.") { continue } 
+			if !strings.HasSuffix(q.Name.String(), ".ygg.local.") { continue }
 
 			fmt.Println("###### Looks like a real request")
 			var address [16]byte
 			copy(address[:], bs[8:24])
 			rsp := dnsmessage.Message{
-				Header: dnsmessage.Header{ ID: msg.Header.ID, Response: true, Authoritative: false },
-				Questions: []dnsmessage.Question{ q },
+				Header: dnsmessage.Header{ ID: msg.Header.ID, Response: true, Authoritative: true },
+				Questions: []dnsmessage.Question{},
 				Answers: []dnsmessage.Resource{
 					{
 						Header:  dnsmessage.ResourceHeader{
@@ -61,20 +56,27 @@ func (tun *TunAdapter) handle_mDNS(bs []byte) {
 				},
 			}
 			rspbuf, err := rsp.Pack()
-			if  err != nil { 
-				fmt.Println("Error packing: ", err) 
+			if  err != nil {
+				fmt.Println("Error packing: ", err)
 				return
 			}
 
+			fmt.Println("dns message length: ", len(rspbuf))
+
+			ipp := *(ip.(*layers.IPv6))
+			udpp := *(udp.(*layers.UDP))
+			udpp.SetNetworkLayerForChecksum(&ipp)
 			buf := gopacket.NewSerializeBuffer()
-			// opts := gopacket.SerializeOptions{}
 			opts := gopacket.SerializeOptions{ FixLengths: true, ComputeChecksums: true, }
+
 			gopacket.SerializeLayers(buf, opts, 
-				&layers.IPv6{ Version: ip.(*layers.IPv6).Version, },
-				&layers.UDP{},
-				gopacket.Payload(rspbuf),
+				&ipp,
+				&udpp,
+				gopacket.Payload(rspbuf[:]),
 			)
-			
+
+			fmt.Println("final size: ", len(buf.Bytes()))
+
 			out_buf := make([]byte, 0, 65553)
 			out_buf = append(out_buf, 0x00, 0x00, 0x00, 0x00)
 			out_buf = append(out_buf, buf.Bytes()...)
