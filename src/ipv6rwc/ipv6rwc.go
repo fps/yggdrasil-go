@@ -7,16 +7,9 @@ import (
 	"net"
 	"sync"
 	"time"
-	// "strings"
-	// "encoding/hex"
 
 	"golang.org/x/net/icmp"
 	"golang.org/x/net/ipv6"
-
-    // "github.com/google/gopacket"
-    // "github.com/google/gopacket/layers"
-	// "github.com/miekg/dns"
-	// "golang.org/x/net/dns/dnsmessage"
 
 	iwt "github.com/Arceliar/ironwood/types"
 
@@ -262,12 +255,10 @@ func (k *keyStore) readPC(p []byte) (int, error) {
 		copy(srcSubnet[:], bs[8:])
 		copy(dstSubnet[:], bs[24:])
 		if dstAddr != k.address && dstSubnet != k.subnet {
-			fmt.Println("readPC: bad local address/subnet: ", net.IP(dstAddr[:]).String(), net.IP(dstSubnet[:]).String())
 			continue // bad local address/subnet
 		}
 		info := k.update(ed25519.PublicKey(from.(iwt.Addr)))
 		if srcAddr != info.address && srcSubnet != info.subnet {
-			fmt.Println("readPC: bad remote address/subnet: ", net.IP(dstAddr[:]).String(), net.IP(dstSubnet[:]).String())
 			continue // bad remote address/subnet
 		}
 		n = copy(p, bs)
@@ -292,8 +283,7 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 	if srcAddr != k.address && srcSubnet != k.subnet {
 		// This happens all the time due to link-local traffic
 		// Don't send back an error, just drop it
-		strErr := fmt.Sprint("incorrect source address: ", net.IP(srcAddr[:]).String(), " (destination: ", net.IP(dstAddr[:]).String(), ")")
-        // fmt.Println(bs)
+		strErr := fmt.Sprint("incorrect source address: ", net.IP(srcAddr[:]).String())
 		return 0, errors.New(strErr)
 	}
 	if dstAddr.IsValid() {
@@ -301,7 +291,7 @@ func (k *keyStore) writePC(bs []byte) (int, error) {
 	} else if dstSubnet.IsValid() {
 		k.sendToSubnet(dstSubnet, bs)
 	} else {
-		return 0, errors.New(fmt.Sprint("invalid destination address: ", net.IP(dstAddr[:]).String(), " (source: ", net.IP(srcAddr[:]).String()))
+		return 0, errors.New("invalid destination address")
 	}
 	return len(bs), nil
 }
