@@ -5,9 +5,85 @@ import (
 	"strings"
 	"golang.org/x/net/dns/dnsmessage"
 	"github.com/google/gopacket"
+	"github.com/google/gopacket/layers"
 )	
 
 const TUN_OFFSET_BYTES = 4
+
+func (tun *TunAdapter) handle_mDNS(bs []byte) {
+	packet := gopacket.NewPacket(bs, layers.LayerTypeIPv6, gopacket.Default)
+	/*
+	for _, layer := range packet.Layers() {
+		fmt.Println("PACKET LAYER:", layer.LayerType())
+	}
+	*/
+
+	ip := packet.Layer(layers.LayerTypeIPv6)
+	if ip == nil { 
+		fmt.Println("no ip layer")
+		return 
+	}
+	fmt.Println(ip.(*layers.IPv6).SrcIP)
+	udp := packet.Layer(layers.LayerTypeUDP);
+	 if udp == nil { 
+		fmt.Println("no udp layer")
+		return 
+	}
+	fmt.Println(udp.(*layers.UDP).Payload)
+
+	var msg dnsmessage.Message
+	err := msg.Unpack(udp.(*layers.UDP).Payload)
+	// fmt.Println(msg)
+	if err != nil {
+		fmt.Println("Error unpacking: ", err)
+	} else {
+		for _, q := range msg.Questions {
+			if q.Type != dnsmessage.TypeAAAA { continue }
+			if !strings.HasSuffix(q.Name.String(), ".ygg.local.") { continue } 
+
+			fmt.Println("###### Looks like a real request")
+			var address [16]byte
+			copy(address[:], bs[8:24])
+			rsp := dnsmessage.Message{
+				Header: dnsmessage.Header{ ID: msg.Header.ID, Response: true, Authoritative: false },
+				Questions: []dnsmessage.Question{ q },
+				Answers: []dnsmessage.Resource{
+					{
+						Header:  dnsmessage.ResourceHeader{
+							Name: q.Name,
+							Type: dnsmessage.TypeAAAA,
+							Class: dnsmessage.ClassINET,
+							TTL: 10,
+						},
+						Body: &dnsmessage.AAAAResource{ AAAA: address },
+						//Body: &dnsmessage.AAAAResource{ AAAA: [16]byte{0xff,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15} },
+					},
+				},
+			}
+			rspbuf, err := rsp.Pack()
+			if  err != nil { 
+				fmt.Println("Error packing: ", err) 
+				return
+			}
+
+			buf := gopacket.NewSerializeBuffer()
+			// opts := gopacket.SerializeOptions{}
+			opts := gopacket.SerializeOptions{ FixLengths: true, ComputeChecksums: true, }
+			gopacket.SerializeLayers(buf, opts, 
+				&layers.IPv6{ Version: ip.(*layers.IPv6).Version, },
+				&layers.UDP{},
+				gopacket.Payload(rspbuf),
+			)
+			
+			out_buf := make([]byte, 0, 65553)
+			out_buf = append(out_buf, 0x00, 0x00, 0x00, 0x00)
+			out_buf = append(out_buf, buf.Bytes()...)
+
+			tun.iface.Write(out_buf[:], TUN_OFFSET_BYTES)
+			fmt.Println("done")
+		}
+    }
+}
 
 func (tun *TunAdapter) read() {
 	var buf [TUN_OFFSET_BYTES + 65535]byte
@@ -25,64 +101,7 @@ func (tun *TunAdapter) read() {
 		end := begin + n
 		bs := buf[begin:end]
 		if bs[24] == 0xff && bs[25] == 0x02 && bs[39] == 0xfb {
-            var msg dnsmessage.Message
-            err := msg.Unpack(bs[48:])
-            // fmt.Println(msg)
-			if err != nil {
-				fmt.Println("Error unpacking: ", err)
-			} else {
-				for _, q := range msg.Questions {
-					if q.Type != dnsmessage.TypeAAAA { continue }
-					if !strings.HasSuffix(q.Name.String(), ".ygg.local.") { continue } 
-
-					fmt.Println("###### Looks like a real request")
-					var address [16]byte
-					copy(address[:], bs[8:24])
-					rsp := dnsmessage.Message{
-						Header: dnsmessage.Header{ ID: msg.Header.ID, Response: true, Authoritative: false },
-						Questions: []dnsmessage.Question{ q },
-						Answers: []dnsmessage.Resource{
-							{
-								Header:  dnsmessage.ResourceHeader{
-									//Name: dnsmessage.MustNewName("quark.bark.org."),
-									Name: q.Name,
-									Type: dnsmessage.TypeAAAA,
-									Class: dnsmessage.ClassINET,
-									TTL: 10,
-								},
-								// Body: &dnsmessage.AAAAResource{ AAAAA: [4]byte{ 127, 0, 0, 1} },
-								Body: &dnsmessage.AAAAResource{ AAAA: address },
-								//Body: &dnsmessage.AAAAResource{ AAAA: [16]byte{0xff,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15} },
-							},
-						},
-					}
-					rspbuf, err := rsp.Pack()
-					if  err != nil { fmt.Println("Error packing: ", err) }
-					fmt.Println(rsp.GoString())
-					c := make([]byte, 0, 1024)
-
-					// Copy over original IPv6 header
-					c = append(c, 0x00, 0x00, 0x00, 0x00)
-					c = append(c, bs[:48]...)
-					c = append(c, rspbuf[:]...)
-					l := len(rspbuf)
-
-					// set IPv6 content length
-					c[5+4] = byte(l+8)
-					c[4+4] = 0x00
-
-					// set UDP content length
-					c[45+4] = byte(l+8)
-					c[44+4] = 0x00
-
-					// set UDP checksum
-					c[46+4] = 0xff
-					c[47+4] = 0xff
-
-					tun.iface.Write(c[:], TUN_OFFSET_BYTES)
-					fmt.Println("done")
-				}
-			}
+            tun.handle_mDNS(bs)
 		}
 		if _, err := tun.rwc.Write(bs); err != nil {
 			tun.log.Debugln("Unable to send packet:", err)
