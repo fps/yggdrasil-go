@@ -304,13 +304,11 @@ func run(args yggArgs, ctx context.Context, done chan struct{}) {
 
 	cfg.MasterKey = cfg.PrivateKey
 	if cfg.MixinHostname {
+		fmt.Println("Deriving new private key")
 		sigPriv, _ := hex.DecodeString(cfg.PrivateKey)
-		sigPrivSlice := sigPriv[0:32]
-		for index := 0; index < len(sigPrivSlice); index++ {
-			sigPrivSlice[index] = sigPrivSlice[index] ^ args.hostname[index % len(args.hostname)]
-		}
-		cfg.PrivateKey = hex.EncodeToString(ed25519.NewKeyFromSeed(sigPrivSlice))
-		cfg.PublicKey = hex.EncodeToString(ed25519.PrivateKey(sigPriv).Public().(ed25519.PublicKey))
+		newPriv := tuntap.MixinHostname(sigPriv, args.hostname)
+		cfg.PrivateKey = hex.EncodeToString(newPriv)
+		cfg.PublicKey = hex.EncodeToString(newPriv.Public().(ed25519.PublicKey))
 	}
 
 	// Have we been asked for the node address yet? If so, print it and then stop.

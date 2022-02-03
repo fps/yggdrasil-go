@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 	"crypto/ed25519"
+	"encoding/hex"
+	"github.com/yggdrasil-network/yggdrasil-go/src/address"
 	"golang.org/x/net/dns/dnsmessage"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -11,8 +13,12 @@ import (
 
 const TUN_OFFSET_BYTES = 4
 
-func MixinHostname(masterKey ed25519.PrivateKey, hostname string) {
-
+func MixinHostname(masterKey ed25519.PrivateKey, hostname string) ed25519.PrivateKey {
+	sigPrivSlice := masterKey[0:32]
+	for index := 0; index < len(sigPrivSlice); index++ {
+		sigPrivSlice[index] = sigPrivSlice[index] ^ hostname[index % len(hostname)]
+	}
+	return ed25519.NewKeyFromSeed(sigPrivSlice)
 }
 
 func (tun *TunAdapter) handle_mDNS(bs []byte) {
@@ -43,8 +49,9 @@ func (tun *TunAdapter) handle_mDNS(bs []byte) {
 			if !strings.HasSuffix(q.Name.String(), ".ygg.local.") { continue }
 
 			fmt.Println("Got an mDNS request")
-			var address [16]byte
-			copy(address[:], bs[8:24])
+			masterKey, err := hex.DecodeString(tun.config.MasterKey)
+			mixedPriv := MixinHostname(ed25519.PrivateKey(masterKey), strings.TrimSuffix(q.Name.String(), ".ygg.local."))
+			resolved := address.AddrForKey(mixedPriv.Public().(ed25519.PublicKey))
 			rsp := dnsmessage.Message{
 				Header: dnsmessage.Header{ ID: msg.Header.ID, Response: true, Authoritative: true },
 				Questions: []dnsmessage.Question{},
@@ -56,7 +63,7 @@ func (tun *TunAdapter) handle_mDNS(bs []byte) {
 							Class: dnsmessage.ClassINET,
 							TTL: 10,
 						},
-						Body: &dnsmessage.AAAAResource{ AAAA: address },
+						Body: &dnsmessage.AAAAResource{ AAAA: *resolved },
 					},
 				},
 			}
