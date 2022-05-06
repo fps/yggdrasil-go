@@ -46,11 +46,11 @@ func (tun *TunAdapter) handle_mDNS(bs []byte) {
 	} else {
 		for _, q := range msg.Questions {
 			if q.Type != dnsmessage.TypeAAAA { continue }
-			if !strings.HasSuffix(q.Name.String(), ".ygg.local.") { continue }
+			if !strings.HasSuffix(q.Name.String(), "-ygg.local.") { continue }
 
 			fmt.Println("Got an mDNS request")
 			masterKey, err := hex.DecodeString(tun.config.MasterKey)
-			mixedPriv := MixinHostname(ed25519.PrivateKey(masterKey), strings.TrimSuffix(q.Name.String(), ".ygg.local."))
+			mixedPriv := MixinHostname(ed25519.PrivateKey(masterKey), strings.TrimSuffix(q.Name.String(), "-ygg.local."))
 			resolved := address.AddrForKey(mixedPriv.Public().(ed25519.PublicKey))
 			rsp := dnsmessage.Message{
 				Header: dnsmessage.Header{ ID: msg.Header.ID, Response: true, Authoritative: true },
