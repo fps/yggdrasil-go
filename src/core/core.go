@@ -30,7 +30,7 @@ type Core struct {
 	phony.Inbox
 	*iwe.PacketConn
 	config       *config.NodeConfig // Config
-	master       ed25519.PrivateKey
+	unmixed      ed25519.PrivateKey
 	secret       ed25519.PrivateKey
 	public       ed25519.PublicKey
 	links        links
@@ -52,11 +52,11 @@ func (c *Core) _init() error {
 		c.log = log.New(ioutil.Discard, "", 0)
 	}
 
-	sigMaster, err := hex.DecodeString(c.config.MasterKey)
+	sigMixed, err := hex.DecodeString(c.config.MixedPrivateKey)
 	if err != nil {
 		return err
 	}
-	if len(sigMaster) < ed25519.PrivateKeySize {
+	if len(sigMixed) < ed25519.PrivateKeySize {
 		return errors.New("MasterKey is incorrect length")
 	}
 
@@ -68,8 +68,8 @@ func (c *Core) _init() error {
 		return errors.New("PrivateKey is incorrect length")
 	}
 
-	c.master = ed25519.PrivateKey(sigMaster)
-	c.secret = ed25519.PrivateKey(sigPriv)
+	c.unmixed = ed25519.PrivateKey(sigPriv)
+	c.secret = ed25519.PrivateKey(sigMixed)
 	c.public = c.secret.Public().(ed25519.PublicKey)
 	// TODO check public against current.PublicKey, error if they don't match
 

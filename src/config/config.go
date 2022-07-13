@@ -36,7 +36,8 @@ type NodeConfig struct {
 	PublicKey           string                     `comment:"Your public key. Your peers may ask you for this to put\ninto their AllowedPublicKeys configuration."`
 	PrivateKey          string                     `comment:"Your private key. DO NOT share this with anyone!"`
 	MixinHostname       bool                       `comment:"Whether to mix the hostname into the private key (and consequently the public key and IP address derivations.) Note: the effective private and public keys used will then be different from the ones in this config."`
-	MasterKey           string                     `comment:"Your master key. DO NOT share this with anyone!"`
+	MixedPrivateKey    string                     `comment:"Your master key. DO NOT share this with anyone!"`
+	MixedPublicKey    string                      `comment:"Your master key. DO NOT share this with anyone!"`
 	IfName              string                     `comment:"Local network interface name for TUN adapter, or \"auto\" to select\nan interface automatically, or \"none\" to run without TUN."`
 	IfMTU               uint64                     `comment:"Maximum Transmission Unit (MTU) size for your local TUN interface.\nDefault is the largest supported size for your platform. The lowest\npossible value is 1280."`
 	NodeInfoPrivacy     bool                       `comment:"By default, nodeinfo contains some defaults including the platform,\narchitecture and Yggdrasil version. These can help when surveying\nthe network and diagnosing network routing problems. Enabling\nnodeinfo privacy prevents this, so that only items specified in\n\"NodeInfo\" are sent back if specified."`
