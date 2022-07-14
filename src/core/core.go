@@ -71,11 +71,11 @@ func (c *Core) _init() error {
 
 	c.unmixed_secret = ed25519.PrivateKey(sigPriv)
 	c.unmixed_public = c.unmixed_secret.Public().(ed25519.PublicKey)
-	fmt.Println(c.unmixed_public)
+	// fmt.Println(c.unmixed_public)
 
 	c.secret = ed25519.PrivateKey(sigMixed)
 	c.public = c.secret.Public().(ed25519.PublicKey)
-	fmt.Println(c.public)
+	// fmt.Println(c.public)
 	// TODO check public against current.PublicKey, error if they don't match
 
 	c.PacketConn, err = iwe.NewPacketConn(c.secret)
