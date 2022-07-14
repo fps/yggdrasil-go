@@ -302,8 +302,9 @@ func run(args yggArgs, ctx context.Context, done chan struct{}) {
 		return
 	}
 
-	// cfg.MasterPrivateKey = cfg.PrivateKey
-	// cfg.MasterPublicKey = hex.EncodeToString(cfg.PrivateKey.Public().(ed25519.PublicKey))
+
+	// cfg.PrivateKey = ed25519.PrivateKey(sigPriv)
+	// cfg.PublicKey = hex.EncodeToString(cfg.PrivateKey.Public().(ed25519.PublicKey))
 	if cfg.MixinHostname {
 		fmt.Println("Deriving new private key")
 		sigPriv, _ := hex.DecodeString(cfg.PrivateKey)

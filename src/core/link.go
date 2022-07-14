@@ -194,7 +194,10 @@ func (intf *link) handler() (chan struct{}, error) {
 		)
 		return nil, errors.New("remote node is incompatible version")
 	}
+	// fmt.Println(meta.unmixed_key)
+	// fmt.Println(intf.links.core.unmixed_public)
 	if bytes.Compare(meta.unmixed_key, intf.links.core.unmixed_public) != 0 {
+		intf.links.core.log.Error("Unmixed key mismatch")
 		return nil, errors.New("Unmixed key mismatch")
 	}
 	// Check if the remote side matches the keys we expected. This is a bit of a weak
