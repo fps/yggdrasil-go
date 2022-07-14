@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"bytes"
 	"net"
 	"net/url"
 	"strings"
@@ -152,6 +153,7 @@ func (intf *link) handler() (chan struct{}, error) {
 	defer intf.conn.Close()
 	meta := version_getBaseMetadata()
 	meta.key = intf.links.core.public
+	meta.unmixed_key = intf.links.core.unmixed_public
 	metaBytes := meta.encode()
 	// TODO timeouts on send/recv (goroutine for send/recv, channel select w/ timer)
 	var err error
@@ -191,6 +193,9 @@ func (intf *link) handler() (chan struct{}, error) {
 			fmt.Sprintf("%d.%d", meta.ver, meta.minorVer),
 		)
 		return nil, errors.New("remote node is incompatible version")
+	}
+	if bytes.Compare(meta.unmixed_key, intf.links.core.unmixed_public) != 0 {
+		return nil, errors.New("Unmixed key mismatch")
 	}
 	// Check if the remote side matches the keys we expected. This is a bit of a weak
 	// check - in future versions we really should check a signature or something like that.

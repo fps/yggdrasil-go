@@ -29,16 +29,17 @@ type Core struct {
 	// guarantee that it will be covered by the mutex
 	phony.Inbox
 	*iwe.PacketConn
-	config       *config.NodeConfig // Config
-	unmixed      ed25519.PrivateKey
-	secret       ed25519.PrivateKey
-	public       ed25519.PublicKey
-	links        links
-	proto        protoHandler
-	log          *log.Logger
-	addPeerTimer *time.Timer
-	ctx          context.Context
-	ctxCancel    context.CancelFunc
+	config         *config.NodeConfig // Config
+	unmixed_secret ed25519.PrivateKey
+	unmixed_public ed25519.PublicKey
+	secret         ed25519.PrivateKey
+	public         ed25519.PublicKey
+	links          links
+	proto          protoHandler
+	log            *log.Logger
+	addPeerTimer   *time.Timer
+	ctx            context.Context
+	ctxCancel      context.CancelFunc
 }
 
 func (c *Core) _init() error {
@@ -68,7 +69,8 @@ func (c *Core) _init() error {
 		return errors.New("PrivateKey is incorrect length")
 	}
 
-	c.unmixed = ed25519.PrivateKey(sigPriv)
+	c.unmixed_secret = ed25519.PrivateKey(sigPriv)
+	c.unmixed_public = c.unmixed_secret.Public().(ed25519.PublicKey)
 	c.secret = ed25519.PrivateKey(sigMixed)
 	c.public = c.secret.Public().(ed25519.PublicKey)
 	// TODO check public against current.PublicKey, error if they don't match
